@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package com.example.grpcserver;
+
+option java_multiple_files = true;
+option java_package = "com.example.grpcserver.proto";
+option java_outer_classname = "GridDataProto";
+
+// Empty message for requests without parameters
+message Empty {}
+
+// Trade row data matching AG Grid structure
+message TradeRow {
+  string id = 1;
+  string trader_name = 2;
+  string symbol = 3;
+  string trade_type = 4;
+  double quantity = 5;
+  double price = 6;
+  double total_value = 7;
+  string status = 8;
+  int64 timestamp = 9;
+  string region = 10;
+  double profit_loss = 11;
+  string counterparty = 12;
+}
+
+// Filter model for AG Grid
+message FilterModel {
+  string field = 1;
+  string filter_type = 2;  // equals, contains, lessThan, greaterThan, inRange, etc.
+  string filter = 3;       // Primary filter value
+  string filter_to = 4;    // Secondary value for range filters
+  repeated string values = 5;  // For set filters
+}
+
+// Sort model for AG Grid
+message SortModel {
+  string col_id = 1;
+  string sort = 2;  // "asc" or "desc"
+}
+
+// Request for paginated rows (used by AG Grid infinite scroll)
+message GetRowsRequest {
+  int32 start_row = 1;
+  int32 end_row = 2;
+  repeated SortModel sort_model = 3;
+  repeated FilterModel filter_model = 4;
+}
+
+// Response with paginated rows
+message GetRowsResponse {
+  repeated TradeRow rows = 1;
+  int32 last_row = 2;  // -1 if more rows available, otherwise total count
+  int32 total_count = 3;
+}
+
+// Request for streaming updates
+message StreamUpdatesRequest {
+  int32 update_interval_ms = 1;  // How often to send updates (default 500ms)
+  repeated string row_ids = 2;    // Specific rows to watch (empty = all)
+}
+
+// Row update for streaming
+message RowUpdate {
+  string update_type = 1;  // "UPDATE", "INSERT", "DELETE"
+  TradeRow row = 2;
+  int64 update_timestamp = 3;
+}
+
+// Column definition for AG Grid
+message ColumnDefinition {
+  string field = 1;
+  string header_name = 2;
+  string type = 3;  // "text", "number", "date"
+  bool sortable = 4;
+  bool filterable = 5;
+  int32 width = 6;
+  string filter_type = 7;  // "agTextColumnFilter", "agNumberColumnFilter", "agDateColumnFilter", "agSetColumnFilter"
+  bool editable = 8;
+  string cell_renderer = 9;  // Optional custom renderer name
+  string value_formatter = 10;  // Optional value formatter
+}
+
+// Response with column definitions
+message ColumnDefinitionsResponse {
+  repeated ColumnDefinition columns = 1;
+}
+
+// Request for searching trades by field value
+message SearchTradesRequest {
+  string field = 1;    // e.g., "symbol", "status", "region", "trader_name"
+  string value = 2;    // e.g., "AAPL", "EXECUTED", "NA"
+}
+
+// Response with matching trades
+message SearchTradesResponse {
+  repeated TradeRow trades = 1;
+  int32 total_count = 2;
+}
+
+// The GridData service for AG Grid
+service GridDataService {
+  // Paginated data retrieval for AG Grid infinite scroll
+  rpc GetRows(GetRowsRequest) returns (GetRowsResponse);
+
+  // Server streaming for real-time updates
+  rpc StreamUpdates(StreamUpdatesRequest) returns (stream RowUpdate);
+
+  // Get column definitions for AG Grid setup
+  rpc GetColumnDefinitions(Empty) returns (ColumnDefinitionsResponse);
+
+  // Search trades by field name and value
+  rpc SearchTrades(SearchTradesRequest) returns (SearchTradesResponse);
+}
